@@ -1,7 +1,22 @@
+import json
+
 import pygame
+
+AUTOTILE_MAP = {
+    tuple(sorted([(1, 0), (0, 1)])): 0,
+    tuple(sorted([(1, 0), (0, 1), (-1, 0)])): 1,
+    tuple(sorted([(-1, 0), (0, 1)])): 2,
+    tuple(sorted([(-1, 0), (0, -1), (0, 1)])): 3,
+    tuple(sorted([(-1, 0), (0, -1)])): 4,
+    tuple(sorted([(-1, 0), (0, -1), (1, 0)])): 5,
+    tuple(sorted([(1, 0), (0, -1)])): 6,
+    tuple(sorted([(1, 0), (0, -1), (0, 1)])): 7,
+    tuple(sorted([(1, 0), (-1, 0), (0, 1), (0, -1)])): 8,
+}
 
 NEIGHBOUR_OFFSETS = [(-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (0, 0), (-1, 1), (0, 1), (1, 1)]
 PHYSICS_TILES = {"grass", "stone"}
+AUTOTILE_TYPES = {"grass", "stone"}
 
 
 class Tilemap:
@@ -27,6 +42,28 @@ class Tilemap:
 
         return tiles
 
+    def save(self, path):
+        file = open(path, "w")
+
+        json.dump(
+            {
+                "tilemap": self.tilemap,
+                "tile_size": self.tile_size,
+                "offgrid": self.offgrid_tiles
+            }, file
+        )
+
+        file.close()
+
+    def load(self, path):
+        file = open(path, "r")
+        map_data = json.load(file)
+        file.close()
+
+        self.tilemap = map_data["tilemap"]
+        self.tile_size = map_data["tile_size"]
+        self.offgrid_tiles = map_data["offgrid"]
+
     def physics_rects_around(self, pos):
         rects = []
 
@@ -40,6 +77,24 @@ class Tilemap:
                 ))
 
         return rects
+
+    def autotile(self):
+        for location in self.tilemap:
+            tile = self.tilemap[location]
+
+            neighbours = set()
+
+            for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)]:
+                check_location = str(tile["pos"][0] + shift[0]) + ";" + str(tile["pos"][1] + shift[1])
+
+                if check_location in self.tilemap:
+                    if self.tilemap[check_location]["type"] == tile["type"]:
+                        neighbours.add(shift)
+
+            neighbours = tuple(sorted(neighbours))
+
+            if (tile["type"] in AUTOTILE_TYPES) and (neighbours in AUTOTILE_MAP):
+                tile["variant"] = AUTOTILE_MAP[neighbours]
 
     def render(self, surf, offset=(0, 0)):
         for tile in self.offgrid_tiles:
